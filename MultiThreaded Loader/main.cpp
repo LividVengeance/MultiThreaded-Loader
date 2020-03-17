@@ -2,6 +2,7 @@
 #include <Windows.h>
 #include <vector>
 #include <string>
+#include <thread>
 #include "resource.h"
 
 std::vector<HBITMAP> g_bitmaps;
@@ -169,7 +170,13 @@ LRESULT CALLBACK WindowProc(HWND _hwnd, UINT _uiMsg, WPARAM _wparam, LPARAM _lpa
 	{
 
 		_hWindowDC = BeginPaint(_hwnd, &ps);
-		//Do all our painting here
+		for (int i = 0; i < g_bitmaps.size(); i++)
+		{
+			HDC _oldDC = ::CreateCompatibleDC(_hWindowDC);
+			SelectObject(_oldDC, g_bitmaps[i]);
+			BitBlt(_hWindowDC, i * 256, 0, 256, 256, _oldDC, 0, 0, SRCCOPY);
+			DeleteObject(_oldDC);
+		}
 
 		EndPaint(_hwnd, &ps);
 		return (0);
@@ -185,10 +192,18 @@ LRESULT CALLBACK WindowProc(HWND _hwnd, UINT _uiMsg, WPARAM _wparam, LPARAM _lpa
 		{
 			if (ChooseImageFilesToLoad(_hwnd))
 			{
-				//Write code here to create multiple threads to load image files in parallel
+				std::vector<std::thread> g_vecThreads;
 				for (int i = 0; i < g_vecImageFileNames.size(); i++)
 				{
-					g_bitmaps.push_back((HBITMAP)LoadImage(NULL, g_vecImageFileNames[i].c_str(), IMAGE_BITMAP, 256, 256, LR_LOADFROMFILE));
+					std::thread my_thread([&i]()
+						{
+							g_bitmaps.push_back((HBITMAP)LoadImage(NULL, g_vecImageFileNames[i].c_str(), IMAGE_BITMAP, 256, 256, LR_LOADFROMFILE));
+
+						});
+
+
+					my_thread.join();
+					//g_bitmaps.push_back((HBITMAP)LoadImage(NULL, g_vecImageFileNames[i].c_str(), IMAGE_BITMAP, 256, 256, LR_LOADFROMFILE));
 				}
 
 				g_vecImageFileNames.clear();
@@ -196,13 +211,7 @@ LRESULT CALLBACK WindowProc(HWND _hwnd, UINT _uiMsg, WPARAM _wparam, LPARAM _lpa
 				InvalidateRect(_hwnd, NULL, true);
 				UpdateWindow(_hwnd);
 
-				for (int i = 0; i < g_bitmaps.size(); i++)
-				{
-					HDC _oldDC = ::CreateCompatibleDC(_hWindowDC);
-					SelectObject(_oldDC, g_bitmaps[i]);
-					BitBlt(_hWindowDC, i * 256, 0, 256, 256, _oldDC, 0, 0, SRCCOPY);
-					DeleteObject(_oldDC);
-				}
+				
 			}
 			else
 			{
@@ -220,7 +229,6 @@ LRESULT CALLBACK WindowProc(HWND _hwnd, UINT _uiMsg, WPARAM _wparam, LPARAM _lpa
 				{
 					PlaySound(g_vecSoundFileNames[i].c_str(), NULL, SND_FILENAME);
 				}
-				//Write code here to create multiple threads to load sound files in parallel
 			}
 			else
 			{
