@@ -3,6 +3,8 @@
 #include <vector>
 #include <string>
 #include <thread>
+#include <algorithm>
+#include <functional>
 #include "resource.h"
 
 std::vector<HBITMAP> g_bitmaps;
@@ -16,7 +18,9 @@ const unsigned int _kuiWINDOWHEIGHT = 1200;
 //Global Variables
 std::vector<std::wstring> g_vecImageFileNames;
 std::vector<std::wstring> g_vecSoundFileNames;
+std::vector<std::thread> g_vecThreads;
 HINSTANCE g_hInstance;
+
 bool g_bIsFileLoaded = false;
 
 bool ChooseImageFilesToLoad(HWND _hwnd)
@@ -192,26 +196,22 @@ LRESULT CALLBACK WindowProc(HWND _hwnd, UINT _uiMsg, WPARAM _wparam, LPARAM _lpa
 		{
 			if (ChooseImageFilesToLoad(_hwnd))
 			{
-				std::vector<std::thread> g_vecThreads;
+				
 				for (int i = 0; i < g_vecImageFileNames.size(); i++)
 				{
-					std::thread my_thread([&i]()
+					g_vecThreads.push_back(std::thread ([i]()
 						{
 							g_bitmaps.push_back((HBITMAP)LoadImage(NULL, g_vecImageFileNames[i].c_str(), IMAGE_BITMAP, 256, 256, LR_LOADFROMFILE));
-
-						});
-
-
-					my_thread.join();
-					//g_bitmaps.push_back((HBITMAP)LoadImage(NULL, g_vecImageFileNames[i].c_str(), IMAGE_BITMAP, 256, 256, LR_LOADFROMFILE));
+						}));
 				}
+
+
+				std::for_each(g_vecThreads.begin(), g_vecThreads.end(), std::mem_fn(&std::thread::join));
 
 				g_vecImageFileNames.clear();
 
 				InvalidateRect(_hwnd, NULL, true);
 				UpdateWindow(_hwnd);
-
-				
 			}
 			else
 			{
@@ -227,8 +227,14 @@ LRESULT CALLBACK WindowProc(HWND _hwnd, UINT _uiMsg, WPARAM _wparam, LPARAM _lpa
 			{
 				for (int i = 0; i < g_vecSoundFileNames.size(); i++)
 				{
-					PlaySound(g_vecSoundFileNames[i].c_str(), NULL, SND_FILENAME);
+					g_vecThreads.push_back(std::thread([i]()
+						{
+							PlaySound(g_vecSoundFileNames[i].c_str(), NULL, SND_FILENAME);
+						}));
 				}
+
+				std::for_each(g_vecThreads.begin(), g_vecThreads.end(), std::mem_fn(&std::thread::join));
+				g_vecSoundFileNames.clear();
 			}
 			else
 			{
